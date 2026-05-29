@@ -1,0 +1,24 @@
+{
+  "name": "resume-builder",
+  "version": "1.0.0",
+  "description": "简历编辑器 - 模板化简历生成系统",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "export-pdf": "node scripts/export-pdf-cli.mjs",
+    "setup:chrome": "npx puppeteer browsers install chrome"
+  },
+  "dependencies": {
+    "element-plus": "^2.5.0",
+    "html2pdf.js": "^0.10.1",
+    "vue": "^3.4.0",
+    "vuedraggable": "^4.1.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "puppeteer": "^23.11.1",
+    "vite": "^5.0.0"
+  }
+}

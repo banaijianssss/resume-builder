@@ -5,9 +5,36 @@
       <p class="subtitle">选择模板 → 调整模块顺序 → 编辑内容 → 导出简历</p>
     </header>
 
-    <main class="app-main">
+    <nav v-if="isMobile" class="mobile-tabs" role="tablist" aria-label="工作区切换">
+      <button
+        type="button"
+        role="tab"
+        :aria-selected="mobileTab === 'template'"
+        :class="['mobile-tab', { active: mobileTab === 'template' }]"
+        @click="mobileTab = 'template'"
+      >模板</button>
+      <button
+        type="button"
+        role="tab"
+        :aria-selected="mobileTab === 'edit'"
+        :class="['mobile-tab', { active: mobileTab === 'edit' }]"
+        @click="mobileTab = 'edit'"
+      >编辑</button>
+      <button
+        type="button"
+        role="tab"
+        :aria-selected="mobileTab === 'preview'"
+        :class="['mobile-tab', { active: mobileTab === 'preview' }]"
+        @click="mobileTab = 'preview'"
+      >预览</button>
+    </nav>
+
+    <main class="app-main" :class="{ 'is-mobile': isMobile }">
       <!-- 左侧：模板选择 + 模块排序 -->
-      <aside class="template-panel">
+      <aside
+        v-show="!isMobile || mobileTab === 'template'"
+        class="template-panel"
+      >
         <h3>选择模板</h3>
         <TemplateSelector
           :templates="templates"
@@ -57,7 +84,10 @@
       </aside>
 
       <!-- 中间：编辑表单 -->
-      <section class="editor-panel">
+      <section
+        v-show="!isMobile || mobileTab === 'edit'"
+        class="editor-panel"
+      >
         <h3>编辑简历内容</h3>
         <ResumeEditor
           :availableModules="availableModules"
@@ -68,7 +98,10 @@
       </section>
 
       <!-- 右侧：实时预览 + 导出 -->
-      <section class="preview-panel">
+      <section
+        v-show="!isMobile || mobileTab === 'preview'"
+        class="preview-panel"
+      >
         <h3>实时预览</h3>
         <div class="preview-body">
           <ResumePreview
@@ -110,59 +143,46 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import draggable from 'vuedraggable'
 import TemplateSelector from './components/TemplateSelector.vue'
 import ResumeEditor from './components/ResumeEditor.vue'
 import ResumePreview from './components/ResumePreview.vue'
 import { templates, availableModules, getDefaultActiveModules } from './data/templates.js'
+import { useMobileLayout } from './composables/useMobileLayout.js'
+import { debounce } from './utils/debounce.js'
+import {
+  STORAGE_KEY,
+  getEmptyResumeData,
+  loadState,
+  buildPersistedState,
+  validateImportState,
+  normalizeLoadedState
+} from './utils/storage.js'
 
-const STORAGE_KEY = 'resume-builder-data'
+const { isMobile, mobileTab } = useMobileLayout()
 
 // ===== 数据持久化 =====
-function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw)
-  } catch (e) { /* ignore */ }
-  return null
-}
-
-function getEmptyResumeData() {
-  return {
-    avatar: '',
-    name: '',
-    email: '',
-    phone: '',
-    school: '',
-    major: '',
-    degree: '本科',
-    graduationYear: '',
-    objective: '',
-    internship: [],
-    project: [],
-    campus: [],
-    skills: [],
-    awards: '',
-    hobbies: [],
-    selfEval: ''
-  }
-}
-
-function saveState() {
-  const state = {
+function saveStateNow() {
+  const state = buildPersistedState({
     resumeData: resumeData.value,
     activeModules: activeModules.value,
     selectedTemplate: selectedTemplate.value,
     moduleOrder: moduleOrder.value,
     fontSize: fontSize.value
-  }
+  })
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
   } catch {
     ElMessage.warning('本地存储空间不足，请导出 JSON 备份后删除照片或清空数据')
   }
+}
+
+const saveState = debounce(saveStateNow, 400)
+
+function flushSave() {
+  saveStateNow()
 }
 
 // ===== 初始化状态 =====
@@ -175,8 +195,17 @@ const fontSize = ref(saved?.fontSize !== undefined ? saved?.fontSize : 11)
 
 const resumeData = ref(saved?.resumeData || getEmptyResumeData())
 
-// ===== 自动保存 =====
+// ===== 自动保存（防抖） =====
 watch([resumeData, activeModules, selectedTemplate, moduleOrder, fontSize], saveState, { deep: true })
+
+onMounted(() => {
+  window.addEventListener('beforeunload', flushSave)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('beforeunload', flushSave)
+  flushSave()
+})
 
 // ===== 模块排序 =====
 const orderedModuleList = computed({
@@ -200,13 +229,14 @@ function selectTemplate(id) { selectedTemplate.value = id }
 
 // ===== JSON 导入导出 =====
 function exportJSON() {
-  const state = {
+  flushSave()
+  const state = buildPersistedState({
     resumeData: resumeData.value,
     activeModules: activeModules.value,
     selectedTemplate: selectedTemplate.value,
     moduleOrder: moduleOrder.value,
     fontSize: fontSize.value
-  }
+  })
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -227,13 +257,19 @@ function importJSON(e) {
   reader.onload = (ev) => {
     try {
       const state = JSON.parse(ev.target.result)
-      if (state.resumeData) resumeData.value = state.resumeData
-      if (state.activeModules) activeModules.value = state.activeModules
-      if (state.selectedTemplate) selectedTemplate.value = state.selectedTemplate
-      if (state.moduleOrder) moduleOrder.value = state.moduleOrder
-      if (state.fontSize !== undefined) fontSize.value = state.fontSize
+      if (!validateImportState(state)) {
+        ElMessage.error('JSON 格式不正确，缺少 resumeData 或字段类型错误')
+        return
+      }
+      const normalized = normalizeLoadedState(state)
+      resumeData.value = normalized.resumeData
+      if (normalized.activeModules) activeModules.value = normalized.activeModules
+      if (normalized.selectedTemplate) selectedTemplate.value = normalized.selectedTemplate
+      if (normalized.moduleOrder) moduleOrder.value = normalized.moduleOrder
+      if (normalized.fontSize !== null) fontSize.value = normalized.fontSize
+      flushSave()
       ElMessage.success('数据已导入')
-    } catch (err) {
+    } catch {
       ElMessage.error('无效的 JSON 文件')
     }
   }
@@ -383,16 +419,50 @@ h3 {
   min-width: 28px; color: #667eea; font-weight: 600;
 }
 
+.mobile-tabs {
+  display: none;
+  margin: 0 16px;
+  padding: 4px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  gap: 4px;
+}
+.mobile-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 10px 8px;
+  font-size: 14px;
+  color: #666;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.mobile-tab.active {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  font-weight: 600;
+}
+
 /* ===== 移动端响应式 ===== */
 @media (max-width: 1024px) {
+  .mobile-tabs {
+    display: flex;
+    flex-shrink: 0;
+  }
+
   .app-main {
     grid-template-columns: 1fr;
-    gap: 12px; padding: 12px 16px;
+    gap: 12px;
+    padding: 12px 16px;
+  }
+  .app-main.is-mobile .template-panel,
+  .app-main.is-mobile .editor-panel,
+  .app-main.is-mobile .preview-panel {
+    max-height: min(70vh, calc(100vh - 220px));
   }
   .template-panel, .editor-panel, .preview-panel { max-height: none; }
-  .template-panel { order: 1; }
-  .editor-panel { order: 3; }
-  .preview-panel { order: 2; }
 
   .app-header { padding: 14px 20px; }
   .app-header h1 { font-size: 20px; }
@@ -402,6 +472,7 @@ h3 {
 @media print {
   body { background: #fff; }
   .app-header,
+  .mobile-tabs,
   .template-panel,
   .editor-panel,
   .preview-panel > h3,

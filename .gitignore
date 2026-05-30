@@ -3,3 +3,5 @@ dist
 node_modules/.vite
 *.local
 .DS_Store
+components.d.ts
+auto-imports.d.ts

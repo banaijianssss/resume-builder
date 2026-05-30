@@ -52,10 +52,10 @@ npm run preview
 
 ## 上线检查清单
 
-- [ ] 替换 `index.html` 中 `og:*` 为你的站点域名（部署后）
-- [ ] 在 `public/sitemap.xml` 中将 `<loc>/</loc>` 改为完整 URL
+- [x] 替换 `index.html` 中 `og:*` 为站点域名（`resume-builder-bay-kappa.vercel.app`）
+- [x] 在 `public/sitemap.xml` 中使用完整 URL
 - [ ] 确认 `/privacy.html` 可访问
-- [ ] 手机端试编辑与导出
+- [x] 手机端 Tab 切换（模板 / 编辑 / 预览）
 - [ ] （可选）接入 [Umami](https://umami.is) / Google Analytics 统计
 
 ## 项目结构

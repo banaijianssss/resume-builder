@@ -35,8 +35,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
-import html2pdf from 'html2pdf.js'
+import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { buildResumeText, downloadTextFile } from '../utils/resumeToText.js'
 import { calculateSmartPageBreaks } from './preview/pageBreaks.js'
@@ -134,6 +133,7 @@ async function exportPDF() {
   }
 
   try {
+    const { default: html2pdf } = await import('html2pdf.js')
     await html2pdf().set(opt).from(el).save()
     ElMessage.success('PDF 导出成功（已尽量避免模块跨页裁切）')
   } catch (e) {

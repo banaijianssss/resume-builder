@@ -34,26 +34,27 @@ export function getEmptyResumeData() {
 }
 
 export function migrateResumeData(raw) {
-  const d = { ...getEmptyResumeData(), ...(raw && typeof raw === 'object' ? raw : {}) }
+  const src = raw && typeof raw === 'object' ? raw : {}
+  const d = { ...getEmptyResumeData(), ...src }
 
+  const legacySchool = (src.school || d.school || '').trim()
   if (!Array.isArray(d.education)) {
-    if (raw?.school?.trim()) {
-      d.education = [
-        {
-          school: raw.school || '',
-          major: raw.major || '',
-          degree: raw.degree || '本科',
-          graduationYear: raw.graduationYear || ''
-        }
-      ]
-    } else {
-      d.education = []
-    }
-    delete d.school
-    delete d.major
-    delete d.degree
-    delete d.graduationYear
+    d.education = []
   }
+  if (legacySchool && d.education.length === 0) {
+    d.education = [
+      {
+        school: src.school || d.school || '',
+        major: src.major || d.major || '',
+        degree: src.degree || d.degree || '本科',
+        graduationYear: src.graduationYear || d.graduationYear || ''
+      }
+    ]
+  }
+  delete d.school
+  delete d.major
+  delete d.degree
+  delete d.graduationYear
 
   if (!Array.isArray(d.customSections)) d.customSections = []
   if (!Array.isArray(d.pageBreakBefore)) d.pageBreakBefore = []

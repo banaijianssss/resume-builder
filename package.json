@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "node scripts/run-tests.mjs",
     "export-pdf": "node scripts/export-pdf-cli.mjs",
     "setup:chrome": "npx puppeteer browsers install chrome"
   },

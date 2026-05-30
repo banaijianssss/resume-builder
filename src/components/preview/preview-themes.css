@@ -89,10 +89,45 @@
   border-bottom: 1px solid #e8e8e8;
 }
 
+/* 主题色变量 */
+.resume-paper .section-title,
+.resume-paper .modern-title,
+.template-modern .modern-title {
+  color: var(--theme-color, #667eea);
+}
+.template-classic .section-title {
+  border-left-color: var(--theme-color, #667eea);
+}
+
+.force-page-break-before {
+  break-before: page;
+  page-break-before: always;
+}
+
 /* 分页与导出：模块尽量不跨页断开 */
 .resume-paper .resume-section {
   break-inside: avoid;
   page-break-inside: avoid;
+}
+
+@media print {
+  .template-creative {
+    background: #fff !important;
+    color: #333 !important;
+  }
+  .template-creative .creative-name,
+  .template-creative .creative-section h3 {
+    -webkit-text-fill-color: initial !important;
+    color: var(--theme-color, #667eea) !important;
+    background: none !important;
+  }
+  .template-creative .creative-exp-desc,
+  .template-creative .basic-contact-line {
+    color: #555 !important;
+  }
+  .template-creative .creative-accent {
+    background: var(--theme-color, #667eea) !important;
+  }
 }
 
 .resume-paper .pre-wrap {

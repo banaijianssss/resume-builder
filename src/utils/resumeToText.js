@@ -1,8 +1,6 @@
 import { availableModules } from '../data/templates.js'
 
-const moduleLabels = Object.fromEntries(
-  availableModules.map((m) => [m.id, m.label])
-)
+const moduleLabels = Object.fromEntries(availableModules.map((m) => [m.id, m.label]))
 
 function orderedActiveIds(activeModules, moduleOrder) {
   const active = new Set(activeModules)
@@ -16,9 +14,6 @@ function section(lines, title) {
   lines.push(`【${title}】`)
 }
 
-/**
- * 将简历数据转为纯文本（ATS 友好）
- */
 export function buildResumeText(data, activeModules, moduleOrder) {
   const lines = []
   const order = orderedActiveIds(activeModules, moduleOrder)
@@ -26,60 +21,48 @@ export function buildResumeText(data, activeModules, moduleOrder) {
   for (const modId of order) {
     switch (modId) {
       case 'basic': {
-        const name = data.name?.trim() || '姓名'
-        lines.push(name)
+        lines.push(data.name?.trim() || '姓名')
         const contact = [data.email, data.phone].filter(Boolean).join(' | ')
         if (contact) lines.push(contact)
+        const links = [data.github, data.portfolio, data.linkedin].filter((x) => x?.trim())
+        if (links.length) lines.push(links.join(' | '))
         if (data.objective?.trim()) lines.push(`求职意向：${data.objective.trim()}`)
         break
       }
       case 'education': {
-        section(lines, moduleLabels.education)
-        const parts = [
-          data.school,
-          data.major,
-          data.degree,
-          data.graduationYear ? `${data.graduationYear}年毕业` : ''
-        ].filter(Boolean)
-        if (parts.length) lines.push(parts.join(' | '))
+        const list = Array.isArray(data.education) ? data.education : []
+        if (list.length) {
+          section(lines, moduleLabels.education)
+          list.forEach((edu, i) => {
+            if (i > 0) lines.push('')
+            const parts = [
+              edu.school,
+              edu.major,
+              edu.degree,
+              edu.graduationYear ? `${edu.graduationYear}年毕业` : ''
+            ].filter(Boolean)
+            if (parts.length) lines.push(parts.join(' | '))
+          })
+        }
         break
       }
       case 'internship':
-        if (data.internship?.length) {
-          section(lines, moduleLabels.internship)
-          data.internship.forEach((item, i) => {
-            if (i > 0) lines.push('')
-            const head = [item.company, item.period].filter(Boolean).join(' | ')
-            if (head) lines.push(head)
-            if (item.role?.trim()) lines.push(item.role.trim())
-            if (item.description?.trim()) lines.push(item.description.trim())
-          })
-        }
-        break
       case 'project':
-        if (data.project?.length) {
-          section(lines, moduleLabels.project)
-          data.project.forEach((item, i) => {
+      case 'campus': {
+        const items = data[modId]
+        if (items?.length) {
+          section(lines, moduleLabels[modId])
+          const primary = modId === 'internship' ? 'company' : modId === 'project' ? 'name' : 'organization'
+          items.forEach((item, i) => {
             if (i > 0) lines.push('')
-            const head = [item.name, item.period].filter(Boolean).join(' | ')
+            const head = [item[primary], item.period].filter(Boolean).join(' | ')
             if (head) lines.push(head)
             if (item.role?.trim()) lines.push(item.role.trim())
             if (item.description?.trim()) lines.push(item.description.trim())
           })
         }
         break
-      case 'campus':
-        if (data.campus?.length) {
-          section(lines, moduleLabels.campus)
-          data.campus.forEach((item, i) => {
-            if (i > 0) lines.push('')
-            const head = [item.organization, item.period].filter(Boolean).join(' | ')
-            if (head) lines.push(head)
-            if (item.role?.trim()) lines.push(item.role.trim())
-            if (item.description?.trim()) lines.push(item.description.trim())
-          })
-        }
-        break
+      }
       case 'skills':
         if (data.skills?.length) {
           section(lines, moduleLabels.skills)
@@ -87,10 +70,7 @@ export function buildResumeText(data, activeModules, moduleOrder) {
         }
         break
       case 'awards': {
-        const awards = (data.awards || '')
-          .split('\n')
-          .map((a) => a.trim())
-          .filter(Boolean)
+        const awards = (data.awards || '').split('\n').map((a) => a.trim()).filter(Boolean)
         if (awards.length) {
           section(lines, moduleLabels.awards)
           awards.forEach((a) => lines.push(`• ${a}`))
@@ -107,6 +87,15 @@ export function buildResumeText(data, activeModules, moduleOrder) {
         if (data.selfEval?.trim()) {
           section(lines, moduleLabels.self_eval)
           lines.push(data.selfEval.trim())
+        }
+        break
+      case 'custom':
+        if (data.customSections?.length) {
+          data.customSections.forEach((sec) => {
+            if (!sec.title?.trim() && !sec.content?.trim()) return
+            section(lines, sec.title?.trim() || '其他')
+            if (sec.content?.trim()) lines.push(sec.content.trim())
+          })
         }
         break
       default:

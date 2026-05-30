@@ -40,7 +40,10 @@ export const availableModules = [
       { key: 'name', label: '姓名', type: 'text', placeholder: '请输入姓名' },
       { key: 'email', label: '邮箱', type: 'text', placeholder: '请输入邮箱' },
       { key: 'phone', label: '电话', type: 'text', placeholder: '请输入电话' },
-      { key: 'objective', label: '求职意向', type: 'text', placeholder: '请输入求职意向' }
+      { key: 'objective', label: '求职意向', type: 'text', placeholder: '请输入求职意向' },
+      { key: 'github', label: 'GitHub', type: 'text', placeholder: '如：github.com/username' },
+      { key: 'portfolio', label: '作品集/主页', type: 'text', placeholder: '个人网站或作品集链接' },
+      { key: 'linkedin', label: 'LinkedIn', type: 'text', placeholder: '选填' }
     ]
   },
   {
@@ -49,7 +52,8 @@ export const availableModules = [
     icon: '🎓',
     default: true,
     required: false,
-    groups: [
+    isArray: true,
+    fields: [
       { key: 'school', label: '学校', type: 'text', placeholder: '请输入学校名称' },
       { key: 'major', label: '专业', type: 'text', placeholder: '请输入专业' },
       { key: 'degree', label: '学历', type: 'select', options: ['本科', '硕士', '博士', '大专'] },
@@ -135,6 +139,14 @@ export const availableModules = [
     groups: [
       { key: 'selfEval', label: '评价内容', type: 'textarea', placeholder: '请描述自己的优势与特点' }
     ]
+  },
+  {
+    id: 'custom',
+    label: '自定义模块',
+    icon: '📎',
+    default: false,
+    required: false,
+    isCustomSections: true
   }
 ]
 

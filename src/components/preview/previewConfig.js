@@ -18,7 +18,8 @@ export const MODERN_SECTION_TITLES = {
   skills: '🛠 技能',
   awards: '🏆 荣誉奖项',
   self_eval: '📝 自我评价',
-  hobbies: '❤️ 兴趣爱好'
+  hobbies: '❤️ 兴趣爱好',
+  custom: '📎 自定义'
 }
 
 export const CREATIVE_SECTION_TITLES = {
@@ -29,7 +30,8 @@ export const CREATIVE_SECTION_TITLES = {
   skills: { en: 'SKILLS', zh: '技能' },
   awards: { en: 'AWARDS', zh: '荣誉奖项' },
   self_eval: { en: 'ABOUT', zh: '自我评价' },
-  hobbies: { en: 'HOBBIES', zh: '兴趣爱好' }
+  hobbies: { en: 'HOBBIES', zh: '兴趣爱好' },
+  custom: { en: 'MORE', zh: '其他' }
 }
 
 export function parseAwards(awards) {
@@ -46,7 +48,15 @@ export function isModuleVisible(moduleId, data, activeModules) {
     case 'basic':
       return true
     case 'education':
-      return !!(data.school || data.major || data.degree || data.graduationYear)
+      return (
+        (data.education?.length ?? 0) > 0 &&
+        data.education.some((e) => e.school?.trim() || e.major?.trim())
+      )
+    case 'custom':
+      return (
+        (data.customSections?.length ?? 0) > 0 &&
+        data.customSections.some((s) => s.title?.trim() || s.content?.trim())
+      )
     case 'internship':
       return (data.internship?.length ?? 0) > 0
     case 'project':

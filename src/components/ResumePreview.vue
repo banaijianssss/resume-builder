@@ -5,11 +5,7 @@
         <div
           class="resume-paper"
           :class="`template-${template}`"
-          :style="{
-            '--resume-font-size': fontSize + 'px',
-            '--paper-padding': paperPadding,
-            '--photo-size': `${PHOTO_SIZE_MM}mm`
-          }"
+          :style="paperStyle"
           ref="paperRef"
         >
           <div
@@ -35,15 +31,13 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { buildResumeText, downloadTextFile } from '../utils/resumeToText.js'
 import { calculateSmartPageBreaks } from './preview/pageBreaks.js'
 import ResumeTemplate from './preview/ResumeTemplate.vue'
 import { PAPER_PADDING_MM, PHOTO_SIZE_MM } from './preview/previewConstants.js'
 import './preview/preview-themes.css'
-
-const paperPadding = `${PAPER_PADDING_MM}mm`
 
 const emit = defineEmits(['ready'])
 
@@ -52,7 +46,22 @@ const props = defineProps({
   data: { type: Object, required: true },
   activeModules: { type: Array, default: () => [] },
   moduleOrder: { type: Array, default: () => [] },
-  fontSize: { type: Number, default: 11 }
+  fontSize: { type: Number, default: 11 },
+  layout: {
+    type: Object,
+    default: () => ({ lineHeight: 1.55, themeColor: '#667eea', paperPaddingMm: PAPER_PADDING_MM })
+  }
+})
+
+const paperStyle = computed(() => {
+  const pad = props.layout?.paperPaddingMm ?? PAPER_PADDING_MM
+  return {
+    '--resume-font-size': props.fontSize + 'px',
+    '--paper-padding': `${pad}mm`,
+    '--photo-size': `${PHOTO_SIZE_MM}mm`,
+    '--resume-line-height': String(props.layout?.lineHeight ?? 1.55),
+    '--theme-color': props.layout?.themeColor ?? '#667eea'
+  }
 })
 
 const paperRef = ref(null)
@@ -144,15 +153,23 @@ async function exportPDF() {
   }
 }
 
+function getPlainText() {
+  return buildResumeText(props.data, props.activeModules, props.moduleOrder)
+}
+
 function exportTXT() {
-  const text = buildResumeText(
-    props.data,
-    props.activeModules,
-    props.moduleOrder
-  )
   const filename = `${props.data.name?.trim() || '简历'}_简历.txt`
-  downloadTextFile(text, filename)
+  downloadTextFile(getPlainText(), filename)
   ElMessage.success('TXT 导出成功')
+}
+
+async function copyPlainText() {
+  try {
+    await navigator.clipboard.writeText(getPlainText())
+    ElMessage.success('已复制纯文本到剪贴板')
+  } catch {
+    ElMessage.error('复制失败，请检查浏览器权限')
+  }
 }
 
 function buildExportState() {
@@ -161,7 +178,8 @@ function buildExportState() {
     activeModules: props.activeModules,
     selectedTemplate: props.template,
     moduleOrder: props.moduleOrder,
-    fontSize: props.fontSize
+    fontSize: props.fontSize,
+    layout: props.layout
   }
 }
 
@@ -200,7 +218,14 @@ async function exportPDFHD() {
   }
 }
 
-defineExpose({ exportPDF, exportPDFHD, exportTXT, pdfExportAvailable })
+defineExpose({
+  exportPDF,
+  exportPDFHD,
+  exportTXT,
+  copyPlainText,
+  getPlainText,
+  pdfExportAvailable
+})
 </script>
 
 <style scoped>
@@ -238,7 +263,7 @@ defineExpose({ exportPDF, exportPDFHD, exportTXT, pdfExportAvailable })
   font-family: 'Microsoft YaHei', sans-serif;
   font-size: var(--resume-font-size, 11px);
   color: #333;
-  line-height: 1.55;
+  line-height: var(--resume-line-height, 1.55);
   box-sizing: border-box;
   position: relative;
   overflow: visible;

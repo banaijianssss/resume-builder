@@ -5,13 +5,10 @@
       <BasicHeader template="classic" :data="data" />
     </div>
 
-    <div v-else-if="moduleId === 'education'" class="classic-section resume-section" data-resume-section>
+    <div v-else-if="moduleId === 'education'" :class="sectionClasses('education', 'classic-section')" data-resume-section>
       <h2 class="section-title">{{ labels.education }}</h2>
       <div class="section-content">
-        <p>
-          <strong>{{ data.school }}</strong> | {{ data.major }} | {{ data.degree }}
-          <span v-if="data.graduationYear"> | {{ data.graduationYear }}年毕业</span>
-        </p>
+        <EducationBlock :items="data.education" variant="classic" />
       </div>
     </div>
 
@@ -53,6 +50,10 @@
         </div>
       </div>
     </div>
+
+    <div v-else-if="moduleId === 'custom'" :class="sectionClasses('custom', 'classic-section')" data-resume-section>
+      <CustomSectionsBlock :sections="data.customSections" variant="classic" />
+    </div>
   </template>
 
   <!-- ===== 现代模板 ===== -->
@@ -61,13 +62,10 @@
       <BasicHeader template="modern" :data="data" />
     </div>
 
-    <div v-else-if="moduleId === 'education'" class="modern-section resume-section" data-resume-section>
+    <div v-else-if="moduleId === 'education'" :class="sectionClasses('education', 'modern-section')" data-resume-section>
       <h3 class="modern-title">{{ modernTitle }}</h3>
       <div class="modern-content">
-        <p>
-          <strong>{{ data.school }}</strong> — {{ data.major }} · {{ data.degree }}
-          <span v-if="data.graduationYear"> · {{ data.graduationYear }}</span>
-        </p>
+        <EducationBlock :items="data.education" variant="modern" />
       </div>
     </div>
 
@@ -103,6 +101,10 @@
         <span v-for="(h, i) in data.hobbies" :key="i">{{ h }}</span>
       </div>
     </div>
+
+    <div v-else-if="moduleId === 'custom'" :class="sectionClasses('custom', 'modern-section')" data-resume-section>
+      <CustomSectionsBlock :sections="data.customSections" variant="modern" />
+    </div>
   </template>
 
   <!-- ===== 创意模板 ===== -->
@@ -111,12 +113,9 @@
       <BasicHeader template="creative" :data="data" />
     </div>
 
-    <div v-else-if="moduleId === 'education'" class="creative-section resume-section" data-resume-section>
+    <div v-else-if="moduleId === 'education'" :class="sectionClasses('education', 'creative-section')" data-resume-section>
       <h3>{{ creativeTitle.en }} <span>{{ creativeTitle.zh }}</span></h3>
-      <p>
-        <strong>{{ data.school }}</strong> — {{ data.major }} · {{ data.degree }}
-        <span v-if="data.graduationYear"> · {{ data.graduationYear }}</span>
-      </p>
+      <EducationBlock :items="data.education" variant="creative" />
     </div>
 
     <div v-else-if="isExperience" class="creative-section resume-section" data-resume-section>
@@ -147,6 +146,10 @@
         <span v-for="(h, i) in data.hobbies" :key="i">{{ h }}</span>
       </div>
     </div>
+
+    <div v-else-if="moduleId === 'custom'" :class="sectionClasses('custom', 'creative-section')" data-resume-section>
+      <CustomSectionsBlock :sections="data.customSections" variant="creative" />
+    </div>
   </template>
 
   <!-- ===== 侧栏模板 ===== -->
@@ -163,13 +166,9 @@
     </template>
 
     <template v-else>
-      <div v-if="moduleId === 'education'" class="sb-section resume-section" data-resume-section>
+      <div v-if="moduleId === 'education'" :class="sectionClasses('education', 'sb-section')" data-resume-section>
         <div class="sb-stitle">{{ sectionLabel }}</div>
-        <p>
-          <strong>{{ data.school }}</strong><br>
-          {{ data.major }} · {{ data.degree }}
-          <span v-if="data.graduationYear"> · {{ data.graduationYear }}</span>
-        </p>
+        <EducationBlock :items="data.education" variant="sidebar" />
       </div>
       <div v-else-if="isExperience" class="sb-section resume-section" data-resume-section>
         <div class="sb-stitle">{{ sectionLabel }}</div>
@@ -187,6 +186,9 @@
         <div class="sb-stitle">{{ sectionLabel }}</div>
         <p class="pre-wrap">{{ data.selfEval }}</p>
       </div>
+      <div v-else-if="moduleId === 'custom'" :class="sectionClasses('custom', 'sb-section')" data-resume-section>
+        <CustomSectionsBlock :sections="data.customSections" variant="sidebar" />
+      </div>
     </template>
   </template>
 
@@ -197,12 +199,11 @@
     </div>
 
     <template v-else-if="placement === 'body'">
-      <div v-if="moduleId === 'education'" class="tl-item resume-section" data-resume-section>
+      <div v-if="moduleId === 'education'" :class="sectionClasses('education', 'tl-item')" data-resume-section>
         <div class="tl-dot accent"></div>
         <div class="tl-tag">{{ sectionLabel }}</div>
         <div class="tl-card">
-          <strong>{{ data.school }}</strong> — {{ data.major }} · {{ data.degree }}
-          <span v-if="data.graduationYear"> · {{ data.graduationYear }}</span>
+          <EducationBlock :items="data.education" variant="timeline" />
         </div>
       </div>
 
@@ -255,6 +256,10 @@
           </div>
         </div>
       </div>
+
+      <div v-else-if="moduleId === 'custom'" :class="sectionClasses('custom', 'tl-item')" data-resume-section>
+        <CustomSectionsBlock :sections="data.customSections" variant="timeline" />
+      </div>
     </template>
   </template>
 </template>
@@ -262,6 +267,8 @@
 <script setup>
 import { computed } from 'vue'
 import BasicHeader from './BasicHeader.vue'
+import EducationBlock from './EducationBlock.vue'
+import CustomSectionsBlock from './CustomSectionsBlock.vue'
 import ExperienceBlock from './ExperienceBlock.vue'
 import {
   MODULE_LABELS,
@@ -303,4 +310,13 @@ const creativeTitle = computed(
 const awardLines = computed(() => parseAwards(props.data.awards))
 
 const timelineTag = computed(() => experienceMeta.value?.timelineTag || '')
+
+function sectionClasses(moduleId, extra = '') {
+  const list = ['resume-section']
+  if (extra) list.push(extra)
+  if ((props.data.pageBreakBefore || []).includes(moduleId)) {
+    list.push('force-page-break-before')
+  }
+  return list
+}
 </script>

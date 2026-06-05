@@ -7,6 +7,7 @@
         <el-button size="small" :disabled="!canUndo" @click="doUndo">↶ 撤销</el-button>
         <el-button size="small" :disabled="!canRedo" @click="doRedo">↷ 重做</el-button>
         <el-button size="small" @click="loadSample">📋 示例简历</el-button>
+        <el-button size="small" type="warning" @click="openUpgradeDialog('header_cta')">🚀 升级 Pro</el-button>
         <span class="save-status" :class="saveStatus">{{ saveStatusText }}</span>
       </div>
     </header>
@@ -57,6 +58,7 @@
         <TemplateSelector
           :templates="templates"
           :selected="selectedTemplate"
+          :locked-ids="lockedTemplateIds"
           @select="selectTemplate"
         />
 
@@ -172,11 +174,11 @@
           <el-button type="primary" @click="exportPDF" size="large">📄 快速 PDF</el-button>
           <el-button
             v-if="hdPdfAvailable"
-            type="success"
-            @click="exportPDFHD"
+            :type="isPro ? 'success' : 'warning'"
+            @click="isPro ? exportPDFHD() : openUpgradeDialog('hd_pdf_button')"
             size="large"
             title="开发模式下使用 Puppeteer 矢量导出，效果更佳"
-          >✨ 高清 PDF</el-button>
+          >✨ 高清 PDF{{ isPro ? '' : '（Pro）' }}</el-button>
           <el-button @click="exportTXT" size="large">📃 导出 TXT</el-button>
           <el-button @click="copyText" size="large">📋 复制文本</el-button>
           <el-button @click="showAtsPreview = true" size="large">👁 ATS 预览</el-button>
@@ -184,6 +186,10 @@
           <el-button @click="printResume" size="large">🖨 直接打印</el-button>
         </div>
         <p class="export-tip">推荐：打印预览 → 另存为 PDF，排版最接近预览；快速 PDF 适合草稿</p>
+        <div v-if="!isPro" class="pro-upsell">
+          <p>免费版：最多 {{ freeProfileLimit }} 份简历档案，部分模板与高清 PDF 仅 Pro 可用。</p>
+          <el-button type="warning" size="small" @click="openUpgradeDialog('sidebar_upsell')">立即升级 Pro</el-button>
+        </div>
       </section>
     </main>
 
@@ -215,6 +221,21 @@
       <template #footer>
         <el-button type="primary" @click="printResume">打印 / 另存为 PDF</el-button>
         <el-button @click="showPrintPreview = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="showUpgradeDialog" title="升级 Pro（可商用）" width="520px">
+      <div class="upgrade-content">
+        <p>解锁全部模板、高清 PDF 导出、多档案管理与后续增值功能，适合你上线收费运营。</p>
+        <ul>
+          <li>✅ 解锁 5 套模板（含创意 / 侧栏 / 时间轴）</li>
+          <li>✅ 高清 PDF 导出（更适合交付客户）</li>
+          <li>✅ 去除免费版使用限制</li>
+        </ul>
+      </div>
+      <template #footer>
+        <el-button @click="showUpgradeDialog = false">稍后再说</el-button>
+        <el-button type="primary" @click="goCheckout">去支付升级</el-button>
       </template>
     </el-dialog>
   </div>
@@ -250,6 +271,19 @@ import {
   formatChecklistMessage
 } from './utils/resumeValidation.js'
 import { buildResumeText } from './utils/resumeToText.js'
+import { trackEvent } from './utils/analytics.js'
+import {
+  proEnabled,
+  freeProfileLimit,
+  contactUrl,
+  isTemplateLocked,
+  getLockedTemplateIds
+} from './utils/monetization.js'
+import {
+  verifyStoredProToken,
+  activateProFromUrlIfNeeded,
+  createCheckoutSession
+} from './utils/proAccess.js'
 
 const { isMobile, mobileTab } = useMobileLayout()
 
@@ -283,9 +317,13 @@ const saveStatus = ref('saved')
 const jdText = ref('')
 const showAtsPreview = ref(false)
 const showPrintPreview = ref(false)
+const showUpgradeDialog = ref(false)
 const previewRef = ref(null)
 const hdPdfAvailable = ref(false)
 const fileInput = ref(null)
+const upgradeSource = ref('unknown')
+const isPro = ref(proEnabled)
+const lockedTemplateIds = computed(() => getLockedTemplateIds(isPro.value))
 
 const profileList = computed(() =>
   Object.values(profiles.value).map((p) => ({ id: p.id, name: p.name }))
@@ -404,7 +442,19 @@ watch(
   { deep: true }
 )
 
-onMounted(() => {
+onMounted(async () => {
+  const activated = await activateProFromUrlIfNeeded()
+  if (activated.activated) {
+    isPro.value = true
+    ElMessage.success('支付成功，Pro 已解锁')
+  } else {
+    const verified = await verifyStoredProToken()
+    isPro.value = proEnabled || verified.isPro
+  }
+  if (isTemplateLocked(selectedTemplate.value, isPro.value)) {
+    selectedTemplate.value = 'classic'
+  }
+
   clearHistory()
   record()
   window.addEventListener('beforeunload', flushSave)
@@ -437,7 +487,13 @@ function moveModule(index, direction) {
 }
 
 // ===== 模板切换 =====
-function selectTemplate(id) { selectedTemplate.value = id }
+function selectTemplate(id) {
+  if (isTemplateLocked(id, isPro.value)) {
+    openUpgradeDialog('select_locked_template')
+    return
+  }
+  selectedTemplate.value = id
+}
 
 // ===== JSON 导入导出 =====
 function switchProfile(id) {
@@ -450,6 +506,11 @@ function switchProfile(id) {
 }
 
 function addProfile() {
+  if (!isPro.value && Object.keys(profiles.value).length >= freeProfileLimit) {
+    ElMessage.warning(`免费版最多创建 ${freeProfileLimit} 份简历，请升级 Pro 解锁`)
+    openUpgradeDialog('profile_limit')
+    return
+  }
   const id = `p-${Date.now()}`
   profiles.value[id] = createProfile(id, `简历 ${Object.keys(profiles.value).length + 1}`)
   activeProfileId.value = id
@@ -583,12 +644,14 @@ function onPreviewReady({ hdPdf }) {
 }
 
 async function exportPDF() {
+  trackEvent('export_pdf_click', { plan: isPro.value ? 'pro' : 'free' })
   await runExportGuard(async () => {
     if (previewRef.value) await previewRef.value.exportPDF()
   })
 }
 
 async function exportPDFHD() {
+  trackEvent('export_hd_pdf_click', { plan: isPro.value ? 'pro' : 'free' })
   await runExportGuard(async () => {
     if (previewRef.value) await previewRef.value.exportPDFHD()
   })
@@ -633,6 +696,28 @@ async function clearData() {
     ElMessage.success('已清空')
   } catch {
     /* 用户取消 */
+  }
+}
+
+function openUpgradeDialog(source = 'unknown') {
+  upgradeSource.value = source
+  showUpgradeDialog.value = true
+  trackEvent('upgrade_dialog_open', { source, plan: isPro.value ? 'pro' : 'free' })
+}
+
+async function goCheckout() {
+  trackEvent('checkout_click', { source: upgradeSource.value })
+  try {
+    const target = await createCheckoutSession()
+    window.location.href = target
+    showUpgradeDialog.value = false
+  } catch {
+    if (contactUrl) {
+      window.open(contactUrl, '_blank', 'noopener')
+      ElMessage.warning('支付通道暂不可用，已为你打开人工开通入口')
+      return
+    }
+    ElMessage.error('支付通道初始化失败，请稍后重试')
   }
 }
 </script>
@@ -903,6 +988,28 @@ h3 {
   color: #999;
   text-align: center;
   line-height: 1.4;
+}
+.pro-upsell {
+  margin-top: 10px;
+  border: 1px dashed #f2c97d;
+  background: #fff9ed;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: #946200;
+}
+.upgrade-content {
+  font-size: 14px;
+  color: #333;
+  line-height: 1.6;
+}
+.upgrade-content ul {
+  margin: 10px 0 0;
+  padding-left: 20px;
 }
 
 .app-footer {

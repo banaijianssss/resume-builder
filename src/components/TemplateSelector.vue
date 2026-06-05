@@ -3,7 +3,7 @@
     <div
       v-for="template in templates"
       :key="template.id"
-      :class="['template-item', { active: selected === template.id }]"
+      :class="['template-item', { active: selected === template.id, locked: isLocked(template.id) }]"
       @click="$emit('select', template.id)"
     >
       <div class="template-preview" :class="`preview-${template.id}`">
@@ -16,7 +16,10 @@
         </div>
       </div>
       <div class="template-info">
-        <span class="template-name">{{ template.name }}</span>
+        <span class="template-name">
+          {{ template.name }}
+          <span v-if="isLocked(template.id)" class="lock-tag">PRO</span>
+        </span>
         <span class="template-desc">{{ template.description }}</span>
       </div>
     </div>
@@ -24,11 +27,16 @@
 </template>
 
 <script setup>
-defineProps({
+const props = defineProps({
   templates: { type: Array, required: true },
-  selected: { type: String, required: true }
+  selected: { type: String, required: true },
+  lockedIds: { type: Array, default: () => [] }
 })
 defineEmits(['select'])
+
+function isLocked(templateId) {
+  return props.lockedIds.includes(templateId)
+}
 </script>
 
 <style scoped>
@@ -50,6 +58,12 @@ defineEmits(['select'])
 
 .template-item:hover { border-color: #667eea; }
 .template-item.active { border-color: #667eea; background: #f0f2ff; }
+.template-item.locked {
+  border-style: dashed;
+}
+.template-item.locked:hover {
+  border-color: #e6a23c;
+}
 
 .template-preview {
   width: 90px;
@@ -131,6 +145,16 @@ defineEmits(['select'])
   font-size: 13px;
   font-weight: bold;
   color: #333;
+}
+.lock-tag {
+  margin-left: 6px;
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 10px;
+  border-radius: 999px;
+  color: #fff;
+  background: #e6a23c;
+  vertical-align: middle;
 }
 
 .template-desc {

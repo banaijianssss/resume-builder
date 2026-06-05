@@ -77,6 +77,33 @@ resume-builder/
 
 Vue 3 · Vite 5 · Element Plus · html2pdf.js · vuedraggable
 
+## 盈利化配置（Pro 版本）
+
+项目已内置基础付费转化能力（免费额度限制、Pro 升级入口、模板锁定、高清 PDF 权益、埋点接口），并支持 Stripe Checkout 自动激活 Pro。
+
+1. 复制 `.env.example` 为 `.env`
+2. 配置支付与联系地址：
+
+```bash
+VITE_PRO_ENABLED=false
+VITE_FREE_PROFILE_LIMIT=2
+VITE_CONTACT_URL=https://your-contact-url
+
+STRIPE_SECRET_KEY=sk_live_xxx
+STRIPE_PRICE_ID=price_xxx
+APP_BASE_URL=https://your-domain.com
+PRO_TOKEN_SECRET=long-random-secret
+PRO_TOKEN_EXPIRES_DAYS=3650
+```
+
+说明：
+
+- `STRIPE_PRICE_ID` 使用你在 Stripe 创建的商品价格 ID。
+- 支付成功后会回跳到站点首页并自动激活 Pro。
+- `PRO_TOKEN_SECRET` 建议用高强度随机字符串（至少 32 位）。
+
+详细商业化节奏见 `docs/profit-launch-playbook.md`。
+
 ## 许可证
 
 MIT License

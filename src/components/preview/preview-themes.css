@@ -236,3 +236,25 @@
 .tl-desc { color: #666; font-size: 0.955em; margin-top: 3px; }
 .tl-skills { display: flex; flex-wrap: wrap; gap: 5px; }
 .tl-skill { display: inline-block; background: linear-gradient(135deg,#667eea,#764ba2); color: #fff; padding: 3px 10px; border-radius: 20px; font-size: 0.955em; }
+
+/* ========== Phase 2 新模板 ========== */
+.basic-header--minimal .name { font-size: 2em; letter-spacing: 2px; font-weight: 300; }
+.basic-header--minimal .basic-contact-line { color: #888; font-size: 0.92em; }
+.resume-paper.theme-minimal .resume-section-title { border-bottom: 1px solid #ddd; color: #333; font-weight: 500; }
+
+.basic-header--executive { border-bottom: 3px solid #1e293b; padding-bottom: 12px; }
+.basic-header--executive .name { color: #1e293b; font-size: 2.2em; }
+.basic-header--executive .basic-contact-line { color: #475569; }
+.resume-paper.theme-executive .resume-section-title { color: #1e293b; border-color: #1e293b; }
+
+.basic-header--academic .name { font-family: Georgia, 'Times New Roman', serif; font-size: 2.1em; }
+.basic-header--academic .basic-contact-line { font-family: Georgia, serif; color: #555; }
+.resume-paper.theme-academic .resume-section-title { font-family: Georgia, serif; border-bottom: 1px solid #999; }
+
+.basic-header--tech .name { font-family: Consolas, 'Courier New', monospace; color: #0f766e; }
+.basic-header--tech .basic-contact-line { font-family: Consolas, monospace; color: #64748b; }
+.resume-paper.theme-tech .resume-section-title { color: #0f766e; border-bottom: 2px solid #14b8a6; }
+
+.basic-header--elegant .name { color: #92400e; font-size: 2.15em; letter-spacing: 1px; }
+.basic-header--elegant .basic-contact-line { color: #78716c; }
+.resume-paper.theme-elegant .resume-section-title { color: #92400e; border-bottom: 2px solid #d6b28f; }

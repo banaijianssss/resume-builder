@@ -13,6 +13,14 @@ import {
 import { getResumeChecklist, validateField } from '../src/utils/resumeValidation.js'
 import { matchSkillsToJd } from '../src/utils/keywordMatch.js'
 import { buildResumeText } from '../src/utils/resumeToText.js'
+import { getResumeHealth } from '../src/utils/resumeScore.js'
+import {
+  addApplication,
+  countByStatus,
+  saveApplications,
+  APPLICATION_STATUSES
+} from '../src/utils/applicationTracker.js'
+import { sampleResumeState } from '../src/data/sampleResume.js'
 
 let passed = 0
 let failed = 0
@@ -84,6 +92,38 @@ const persisted = buildPersistedAppState({
   profiles: { default: { id: 'default', name: '默认', resumeData: getEmptyResumeData() } }
 })
 assert(persisted.version === STORAGE_VERSION, 'storage version')
+
+// 8. 简历健康分
+const emptyHealth = getResumeHealth({
+  data: getEmptyResumeData(),
+  activeModules: ['basic', 'education', 'skills'],
+  moduleOrder: ['basic', 'education', 'skills']
+})
+assert(emptyHealth.score < 50, 'empty resume low health score')
+assert(emptyHealth.quickWins.length > 0, 'empty resume quick wins')
+
+const sampleHealth = getResumeHealth({
+  data: sampleResumeState.resumeData,
+  activeModules: sampleResumeState.activeModules,
+  moduleOrder: sampleResumeState.moduleOrder,
+  jdText: 'Vue.js JavaScript HTML/CSS Git Node.js 前端开发'
+})
+assert(sampleHealth.score >= 75, 'sample resume strong health score')
+assert(sampleHealth.checks.length === 6, 'health check count')
+assert(sampleHealth.checks.some((c) => c.id === 'skills' && c.points >= 10), 'skill health score')
+
+// 9. 投递追踪
+const trackerStore = {}
+globalThis.localStorage = {
+  getItem: (k) => trackerStore[k] ?? null,
+  setItem: (k, v) => { trackerStore[k] = v }
+}
+const apps = saveApplications([])
+assert(apps.length === 0, 'tracker init empty')
+const added = addApplication({ company: '测试公司', role: '前端', status: 'applied' })
+assert(added.length === 1, 'tracker add one')
+assert(countByStatus(added).applied === 1, 'tracker status count')
+assert(APPLICATION_STATUSES.length === 5, 'tracker status options')
 
 console.log(`\n测试结果: ${passed} 通过, ${failed} 失败`)
 if (failed > 0) process.exit(1)

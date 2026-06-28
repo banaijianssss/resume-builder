@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>简历分享预览</title>
+  <style>
+    body { margin: 0; font-family: "Microsoft YaHei", system-ui, sans-serif; background: #f3f4f6; color: #111827; }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 24px 16px 48px; }
+    .card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 8px 24px rgba(15,23,42,.06); }
+    h1 { font-size: 20px; margin: 0 0 8px; }
+    p { color: #6b7280; font-size: 14px; }
+    pre { white-space: pre-wrap; word-break: break-word; line-height: 1.6; font-size: 14px; }
+    .err { color: #b91c1c; }
+    a { color: #4f46e5; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>简历分享预览</h1>
+      <p id="meta">正在加载...</p>
+      <pre id="content"></pre>
+    </div>
+  </div>
+  <script type="module">
+    function fromBase64Url(token) {
+      const b64 = token.replace(/-/g, '+').replace(/_/g, '/')
+      const pad = '='.repeat((4 - (b64.length % 4)) % 4)
+      const raw = decodeURIComponent(escape(atob(b64 + pad)))
+      return JSON.parse(raw)
+    }
+
+    function buildText(data, activeModules, moduleOrder) {
+      const order = moduleOrder?.length ? moduleOrder : activeModules
+      const lines = []
+      if (data.name) lines.push(data.name)
+      const contacts = [data.email, data.phone, data.github, data.portfolio].filter(Boolean)
+      if (contacts.length) lines.push(contacts.join(' | '))
+      if (data.objective) lines.push('', '求职意向', data.objective)
+      for (const mod of order) {
+        if (!activeModules.includes(mod)) continue
+        if (mod === 'education' && Array.isArray(data.education)) {
+          lines.push('', '教育背景')
+          for (const e of data.education) lines.push(`${e.school || ''} ${e.major || ''} ${e.degree || ''} ${e.graduationYear || ''}`.trim())
+        }
+        if (['internship', 'project', 'campus'].includes(mod) && Array.isArray(data[mod])) {
+          for (const item of data[mod]) {
+            lines.push('', item.company || item.name || item.organization || mod, item.description || '')
+          }
+        }
+        if (mod === 'skills' && Array.isArray(data.skills)) lines.push('', '技能', data.skills.join('、'))
+        if (mod === 'self_eval' && data.selfEval) lines.push('', '自我评价', data.selfEval)
+      }
+      return lines.join('\n')
+    }
+
+    const meta = document.getElementById('meta')
+    const content = document.getElementById('content')
+    const params = new URLSearchParams(location.search)
+    const shareId = params.get('id')
+
+    async function load() {
+      try {
+        let payload = null
+        if (shareId) {
+          const [viewRes, loadRes] = await Promise.all([
+            fetch('/api/share/view', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ shareId })
+            }),
+            fetch('/api/share/load', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ shareId })
+            })
+          ])
+          const viewData = await viewRes.json().catch(() => ({}))
+          const loadData = await loadRes.json().catch(() => ({}))
+          payload = loadData.payload
+          meta.textContent = `模板：${payload?.selectedTemplate || 'classic'} · 只读分享${viewData.views != null ? ` · 浏览 ${viewData.views} 次` : ''}`
+        } else {
+          payload = fromBase64Url(location.hash.slice(1))
+          meta.textContent = `模板：${payload.selectedTemplate || 'classic'} · 只读分享链接`
+        }
+        if (!payload) {
+          meta.innerHTML = '<span class="err">分享链接已过期或未配置云存储。</span> <a href="/">返回编辑器</a>'
+          return
+        }
+        if (!payload?.resumeData) throw new Error('invalid')
+        content.textContent = buildText(payload.resumeData, payload.activeModules || [], payload.moduleOrder || [])
+      } catch {
+        meta.innerHTML = '<span class="err">分享链接无效或已损坏。</span> <a href="/">返回编辑器</a>'
+        content.textContent = ''
+      }
+    }
+
+    load()
+  </script>
+</body>
+</html>

@@ -92,13 +92,27 @@
               >
                 <el-option v-for="opt in field.options" :key="opt" :label="opt" :value="opt" />
               </el-select>
-              <el-input
-                v-else-if="field.type === 'textarea'"
-                type="textarea"
-                v-model="item[field.key]"
-                :rows="2"
-                :placeholder="field.placeholder"
-              />
+              <div v-else-if="field.type === 'textarea'" class="textarea-with-verbs">
+                <el-input
+                  type="textarea"
+                  v-model="item[field.key]"
+                  :rows="2"
+                  :placeholder="field.placeholder"
+                />
+                <div v-if="field.key === 'description'" class="textarea-tools">
+                  <div class="verb-suggestions">
+                    <span class="verb-label">动词建议：</span>
+                    <el-tag
+                      v-for="verb in suggestVerbs(item.role || item.description)"
+                      :key="verb"
+                      size="small"
+                      class="verb-tag"
+                      @click="appendVerb(item, field.key, verb)"
+                    >{{ verb }}</el-tag>
+                  </div>
+                  <el-button size="small" link type="primary" @click="polishDescription(item, field.key)">✨ AI 润色</el-button>
+                </div>
+              </div>
             </el-form-item>
           </div>
           <div v-if="!modelValue[mod.id]?.length" class="empty-hint">暂无内容，点击「+ 添加」</div>
@@ -173,6 +187,8 @@ import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { compressImageFile } from '../utils/compressImage.js'
 import { validateField } from '../utils/resumeValidation.js'
+import { suggestVerbs } from '../data/actionVerbs.js'
+import { polishExperienceText } from '../utils/aiPolish.js'
 
 const props = defineProps({
   availableModules: { type: Array, required: true },
@@ -299,6 +315,26 @@ function removeTagItem(moduleId, index) {
   arr.splice(index, 1)
   patch({ [moduleId]: arr })
 }
+
+function appendVerb(item, fieldKey, verb) {
+  const current = (item[fieldKey] || '').trim()
+  item[fieldKey] = current ? `${verb}${current.startsWith(verb) ? current.slice(verb.length) : current}` : `${verb}…`
+}
+
+async function polishDescription(item, fieldKey) {
+  const text = item[fieldKey]
+  if (!text?.trim()) {
+    ElMessage.warning('请先输入描述内容')
+    return
+  }
+  try {
+    const { polished, mode } = await polishExperienceText({ text, role: item.role || item.name || '' })
+    item[fieldKey] = polished
+    ElMessage.success(mode === 'ai' ? 'AI 润色完成' : '规则润色完成（可配置 OPENAI_API_KEY 启用 AI）')
+  } catch (e) {
+    ElMessage.error(e.message || '润色失败')
+  }
+}
 </script>
 
 <style scoped>
@@ -310,6 +346,11 @@ function removeTagItem(moduleId, index) {
 }
 .field-group { margin-bottom: 24px; }
 .field-group h4 { font-size: 14px; color: #667eea; margin-bottom: 0; }
+.textarea-with-verbs { width: 100%; }
+.textarea-tools { margin-top: 8px; display: grid; gap: 6px; }
+.verb-suggestions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.verb-label { font-size: 11px; color: #909399; }
+.verb-tag { cursor: pointer; }
 .group-header {
   display: flex;
   justify-content: space-between;

@@ -24,6 +24,31 @@ export const templates = [
     id: 'timeline',
     name: '时间轴风格',
     description: '时间线展示经历，一目了然'
+  },
+  {
+    id: 'minimal',
+    name: '极简留白',
+    description: '大量留白，突出核心信息'
+  },
+  {
+    id: 'executive',
+    name: '高管商务',
+    description: '沉稳深色标题，适合管理岗'
+  },
+  {
+    id: 'academic',
+    name: '学术科研',
+    description: '衬线风格，适合科研学术岗'
+  },
+  {
+    id: 'tech',
+    name: '技术极客',
+    description: '科技感配色，适合工程师'
+  },
+  {
+    id: 'elegant',
+    name: '优雅金棕',
+    description: '精致配色，适合咨询/金融'
   }
 ]
 

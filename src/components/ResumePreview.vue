@@ -4,7 +4,7 @@
       <div class="paper-stage">
         <div
           class="resume-paper"
-          :class="`template-${template}`"
+          :class="[`template-${template}`, `theme-${template}`]"
           :style="paperStyle"
           ref="paperRef"
         >
@@ -79,16 +79,21 @@ function refreshPageBreaks() {
 
 let resizeObserver = null
 
+function exportStyles() {
+  return Array.from(document.styleSheets)
+    .map((sheet) => {
+      try {
+        return Array.from(sheet.cssRules || []).map((r) => r.cssText).join('\n')
+      } catch {
+        return ''
+      }
+    })
+    .join('\n')
+}
+
 onMounted(async () => {
-  if (import.meta.env.DEV) {
-    try {
-      const res = await fetch('/api/export-pdf', { method: 'HEAD' })
-      pdfExportAvailable.value = res.ok
-    } catch {
-      pdfExportAvailable.value = false
-    }
-  }
-  emit('ready', { hdPdf: pdfExportAvailable.value })
+  pdfExportAvailable.value = true
+  emit('ready', { hdPdf: true })
   refreshPageBreaks()
   if (typeof ResizeObserver !== 'undefined' && paperRef.value) {
     resizeObserver = new ResizeObserver(refreshPageBreaks)
@@ -184,10 +189,8 @@ function buildExportState() {
 }
 
 async function exportPDFHD() {
-  if (!pdfExportAvailable.value) {
-    ElMessage.warning('高清 PDF 需在开发模式下使用（npm run dev），或改用打印 / 快速 PDF')
-    return
-  }
+  const el = paperRef.value
+  if (!el) return
 
   showPageBreaks.value = false
   await nextTick()
@@ -196,7 +199,7 @@ async function exportPDFHD() {
     const res = await fetch('/api/export-pdf', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buildExportState())
+      body: JSON.stringify({ html: `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${exportStyles()}</style></head><body>${el.outerHTML}</body></html>` })
     })
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: res.statusText }))

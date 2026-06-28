@@ -67,8 +67,11 @@ export async function activateProFromUrlIfNeeded() {
   return { activated: true }
 }
 
-export async function createCheckoutSession() {
-  const { ok, data } = await postJson('/api/create-checkout-session', {})
+export async function createCheckoutSession(mode = 'lifetime') {
+  const endpoint = mode === 'subscription'
+    ? '/api/create-checkout-subscription'
+    : '/api/create-checkout-session'
+  const { ok, data } = await postJson(endpoint, {})
   if (!ok || !data.url) {
     throw new Error(data?.error || '创建支付链接失败')
   }

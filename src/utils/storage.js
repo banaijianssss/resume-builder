@@ -1,3 +1,5 @@
+import { getEmptyCoverLetter } from './coverLetter.js'
+
 export const STORAGE_KEY = 'resume-builder-data'
 export const STORAGE_VERSION = 2
 export const BACKUP_HINT_KEY = 'resume-builder-backup-hint-seen'
@@ -71,6 +73,7 @@ function createProfilePayload(overrides = {}) {
     id: overrides.id || `p-${Date.now()}`,
     name: overrides.name || '默认简历',
     resumeData: migrateResumeData(overrides.resumeData),
+    coverLetter: { ...getEmptyCoverLetter(), ...(overrides.coverLetter || {}) },
     activeModules: overrides.activeModules ?? null,
     selectedTemplate: overrides.selectedTemplate ?? 'classic',
     moduleOrder: overrides.moduleOrder ?? null,
@@ -145,6 +148,7 @@ function normalizeProfile(p, id) {
     id: p.id || id,
     name: typeof p.name === 'string' ? p.name : '未命名简历',
     resumeData: migrateResumeData(p.resumeData),
+    coverLetter: { ...getEmptyCoverLetter(), ...(p.coverLetter && typeof p.coverLetter === 'object' ? p.coverLetter : {}) },
     activeModules: Array.isArray(p.activeModules) ? p.activeModules : null,
     selectedTemplate: typeof p.selectedTemplate === 'string' ? p.selectedTemplate : 'classic',
     moduleOrder: Array.isArray(p.moduleOrder) ? p.moduleOrder : null,
@@ -165,6 +169,7 @@ export function profileToExportShape(profile) {
   return {
     version: STORAGE_VERSION,
     resumeData: profile.resumeData,
+    coverLetter: profile.coverLetter,
     activeModules: profile.activeModules,
     selectedTemplate: profile.selectedTemplate,
     moduleOrder: profile.moduleOrder,

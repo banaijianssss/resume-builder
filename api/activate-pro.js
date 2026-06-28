@@ -25,8 +25,18 @@ export default async function handler(request, response) {
   try {
     const stripe = getStripeClient()
     const session = await stripe.checkout.sessions.retrieve(sessionId)
-    if (!session || session.payment_status !== 'paid') {
-      response.status(402).json({ error: 'Session is not paid' })
+    let active = session?.payment_status === 'paid'
+
+    if (session?.mode === 'subscription' && session.subscription) {
+      const subId = typeof session.subscription === 'string'
+        ? session.subscription
+        : session.subscription.id
+      const sub = await stripe.subscriptions.retrieve(subId)
+      active = ['active', 'trialing'].includes(sub.status)
+    }
+
+    if (!session || !active) {
+      response.status(402).json({ error: 'Session is not paid or active' })
       return
     }
 

@@ -7,6 +7,9 @@
         <el-button size="small" :disabled="!canUndo" @click="doUndo">↶ 撤销</el-button>
         <el-button size="small" :disabled="!canRedo" @click="doRedo">↷ 重做</el-button>
         <el-button size="small" @click="loadSample">📋 示例简历</el-button>
+        <el-button size="small" @click="copyShareLink">🔗 分享链接</el-button>
+        <el-button size="small" @click="saveCloudSync">☁️ 云备份</el-button>
+        <el-button size="small" @click="loadCloudSync">☁️ 云恢复</el-button>
         <el-button size="small" type="warning" @click="openUpgradeDialog('header_cta')">🚀 升级 Pro</el-button>
         <span class="save-status" :class="saveStatus">{{ saveStatusText }}</span>
       </div>
@@ -27,6 +30,13 @@
         :class="['mobile-tab', { active: mobileTab === 'edit' }]"
         @click="mobileTab = 'edit'"
       >编辑</button>
+      <button
+        type="button"
+        role="tab"
+        :aria-selected="mobileTab === 'cover'"
+        :class="['mobile-tab', { active: mobileTab === 'cover' }]"
+        @click="mobileTab = 'cover'"
+      >求职信</button>
       <button
         type="button"
         role="tab"
@@ -78,10 +88,10 @@
               <div :class="['module-item', { disabled: mod.required }]">
                 <span class="drag-handle">⠿</span>
                 <el-checkbox
-                  v-model="activeModules"
-                  :label="mod.id"
+                  :model-value="activeModules.includes(mod.id)"
                   :disabled="mod.required"
                   size="small"
+                  @change="(checked) => setModuleActive(mod.id, checked)"
                 >
                   {{ mod.icon }} {{ mod.label }}
                 </el-checkbox>
@@ -105,11 +115,11 @@
 
       <!-- 中间：编辑表单 -->
       <section
-        v-show="!isMobile || mobileTab === 'edit'"
+        v-show="!isMobile || mobileTab === 'edit' || mobileTab === 'cover'"
         class="editor-panel"
       >
-        <h3>编辑简历内容</h3>
-        <div class="jd-panel">
+        <h3>{{ mobileTab === 'cover' && isMobile ? '编辑求职信' : '编辑简历内容' }}</h3>
+        <div v-if="!isMobile || mobileTab === 'edit'" class="jd-panel">
           <p class="jd-label">岗位 JD 关键词匹配（可选）</p>
           <el-input
             v-model="jdText"
@@ -122,13 +132,67 @@
             <span v-if="jdMatch.missing.length">，未出现 {{ jdMatch.missing.slice(0, 5).join('、') }}{{ jdMatch.missing.length > 5 ? '…' : '' }}</span>
           </p>
         </div>
-        <ResumeEditor
-          :availableModules="availableModules"
-          :activeModules="activeModules"
-          :moduleOrder="moduleOrder"
-          v-model="resumeData"
-          :highlighted-skills="highlightedSkillSet"
+        <div v-if="!isMobile || mobileTab === 'edit'" class="health-panel">
+          <div class="health-head">
+            <div>
+              <p class="health-kicker">简历健康分</p>
+              <div class="health-score">
+                <strong>{{ resumeHealth.score }}</strong>
+                <span>/100 · {{ resumeHealth.grade }}</span>
+              </div>
+            </div>
+            <el-progress
+              type="circle"
+              :width="64"
+              :stroke-width="7"
+              :percentage="resumeHealth.score"
+              :status="resumeHealth.progressStatus"
+            />
+          </div>
+          <p class="health-summary">{{ resumeHealth.summary }}</p>
+          <div class="health-checks">
+            <span
+              v-for="check in resumeHealth.checks"
+              :key="check.id"
+              :class="['health-check', check.status]"
+              :title="check.detail"
+            >
+              {{ check.label }} {{ check.points }}/{{ check.max }}
+            </span>
+          </div>
+          <ul v-if="resumeHealth.quickWins.length" class="health-wins">
+            <li v-for="win in resumeHealth.quickWins" :key="win">{{ win }}</li>
+          </ul>
+          <div class="ai-actions">
+            <el-button
+              size="small"
+              :loading="aiPending"
+              @click="isPro ? runGenerateSummary() : openUpgradeDialog('ai_summary')"
+            >✨ AI 求职摘要</el-button>
+            <el-button
+              size="small"
+              :loading="aiPending"
+              @click="isPro ? runGenerateInterview() : openUpgradeDialog('ai_interview')"
+            >🎯 AI 面试题</el-button>
+          </div>
+        </div>
+        <ApplicationTracker
+          v-if="!isMobile || mobileTab === 'edit'"
+          :default-jd-text="jdText"
         />
+        <div v-if="!isMobile || mobileTab === 'edit'" class="editor-pane">
+          <ResumeEditor
+            :availableModules="availableModules"
+            :activeModules="activeModules"
+            :moduleOrder="moduleOrder"
+            v-model="resumeData"
+            :highlighted-skills="highlightedSkillSet"
+          />
+        </div>
+        <div v-if="!isMobile || mobileTab === 'cover'" class="editor-pane">
+          <h3 class="pane-title">求职信</h3>
+          <CoverLetterEditor v-model="coverLetter" :resume-name="resumeData.name" />
+        </div>
       </section>
 
       <!-- 右侧：实时预览 + 导出 -->
@@ -173,13 +237,23 @@
         <div class="export-actions">
           <el-button type="primary" @click="exportPDF" size="large">📄 快速 PDF</el-button>
           <el-button
-            v-if="hdPdfAvailable"
             :type="isPro ? 'success' : 'warning'"
             @click="isPro ? exportPDFHD() : openUpgradeDialog('hd_pdf_button')"
             size="large"
             title="开发模式下使用 Puppeteer 矢量导出，效果更佳"
           >✨ 高清 PDF{{ isPro ? '' : '（Pro）' }}</el-button>
           <el-button @click="exportTXT" size="large">📃 导出 TXT</el-button>
+          <el-button
+            :type="isPro ? 'success' : 'warning'"
+            @click="isPro ? exportDocx() : openUpgradeDialog('docx_export')"
+            size="large"
+          >📝 Word{{ isPro ? '' : '（Pro）' }}</el-button>
+          <el-button @click="exportCoverLetterTxt" size="large">✉️ 求职信 TXT</el-button>
+          <el-button
+            v-if="isPro"
+            @click="exportCoverLetterDocx"
+            size="large"
+          >✉️ 求职信 Word</el-button>
           <el-button @click="copyText" size="large">📋 复制文本</el-button>
           <el-button @click="showAtsPreview = true" size="large">👁 ATS 预览</el-button>
           <el-button @click="openPrintPreview" size="large">🖨 打印预览</el-button>
@@ -197,6 +271,15 @@
       <span>免费使用 · 数据仅存于本机浏览器 · 请定期「导出数据」备份</span>
       <a href="/privacy.html" target="_blank" rel="noopener">隐私政策</a>
     </footer>
+
+    <el-dialog v-model="showInterviewDialog" title="AI 面试题预测" width="640px">
+      <ol class="interview-list">
+        <li v-for="(q, i) in interviewQuestions" :key="i">{{ q }}</li>
+      </ol>
+      <template #footer>
+        <el-button type="primary" @click="showInterviewDialog = false">关闭</el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="showAtsPreview" title="ATS 纯文本预览" width="90%" top="5vh">
       <pre class="ats-pre">{{ atsPreviewText }}</pre>
@@ -229,9 +312,13 @@
         <p>解锁全部模板、高清 PDF 导出、多档案管理与后续增值功能，适合你上线收费运营。</p>
         <ul>
           <li>✅ 解锁 5 套模板（含创意 / 侧栏 / 时间轴）</li>
-          <li>✅ 高清 PDF 导出（更适合交付客户）</li>
+          <li>✅ 高清 PDF / Word 导出（更适合交付客户）</li>
+          <li>✅ 求职信编辑、分享链接与多档案管理</li>
           <li>✅ 去除免费版使用限制</li>
         </ul>
+        <p v-if="subscriptionBilling" class="billing-hint">
+          当前为订阅模式：{{ subscriptionTrialDays }} 天试用后自动续费，可随时取消。
+        </p>
       </div>
       <template #footer>
         <el-button @click="showUpgradeDialog = false">稍后再说</el-button>
@@ -248,12 +335,15 @@ import draggable from 'vuedraggable'
 import TemplateSelector from './components/TemplateSelector.vue'
 import ResumeEditor from './components/ResumeEditor.vue'
 import ResumePreview from './components/ResumePreview.vue'
+import CoverLetterEditor from './components/CoverLetterEditor.vue'
+import ApplicationTracker from './components/ApplicationTracker.vue'
 import { templates, availableModules, getDefaultActiveModules } from './data/templates.js'
 import { sampleResumeState } from './data/sampleResume.js'
 import { useMobileLayout } from './composables/useMobileLayout.js'
 import { useUndoRedo } from './composables/useUndoRedo.js'
 import { debounce } from './utils/debounce.js'
 import { matchSkillsToJd } from './utils/keywordMatch.js'
+import { getResumeHealth } from './utils/resumeScore.js'
 import {
   STORAGE_KEY,
   BACKUP_HINT_KEY,
@@ -277,8 +367,15 @@ import {
   freeProfileLimit,
   contactUrl,
   isTemplateLocked,
-  getLockedTemplateIds
+  getLockedTemplateIds,
+  isSubscriptionBilling,
+  subscriptionTrialDays
 } from './utils/monetization.js'
+import { getEmptyCoverLetter, buildCoverLetterText } from './utils/coverLetter.js'
+import { buildShareUrl } from './utils/shareResume.js'
+import { saveToCloud, loadFromCloud } from './utils/cloudSync.js'
+import { exportResumeDocx, exportCoverLetterDocx as exportCoverLetterDocxFile } from './utils/exportDocx.js'
+import { generateInterviewQuestions, generateProfessionalSummary } from './utils/aiGenerate.js'
 import {
   verifyStoredProToken,
   activateProFromUrlIfNeeded,
@@ -292,6 +389,7 @@ function createProfile(id, name, seed = {}) {
     id,
     name,
     resumeData: migrateResumeData(seed.resumeData || getEmptyResumeData()),
+    coverLetter: { ...getEmptyCoverLetter(), ...(seed.coverLetter || {}) },
     activeModules: seed.activeModules || getDefaultActiveModules(),
     selectedTemplate: seed.selectedTemplate || 'classic',
     moduleOrder: seed.moduleOrder || availableModules.map((m) => m.id),
@@ -312,12 +410,17 @@ const moduleOrder = ref(availableModules.map((m) => m.id))
 const fontSize = ref(11)
 const layout = ref(getDefaultLayout())
 const resumeData = ref(getEmptyResumeData())
+const coverLetter = ref(getEmptyCoverLetter())
+const subscriptionBilling = isSubscriptionBilling()
 
 const saveStatus = ref('saved')
 const jdText = ref('')
 const showAtsPreview = ref(false)
 const showPrintPreview = ref(false)
 const showUpgradeDialog = ref(false)
+const showInterviewDialog = ref(false)
+const interviewQuestions = ref([])
+const aiPending = ref(false)
 const previewRef = ref(null)
 const hdPdfAvailable = ref(false)
 const fileInput = ref(null)
@@ -339,6 +442,15 @@ const jdMatch = computed(() => matchSkillsToJd(jdText.value, resumeData.value.sk
 
 const highlightedSkillSet = computed(() => new Set(jdMatch.value.matched))
 
+const resumeHealth = computed(() =>
+  getResumeHealth({
+    data: resumeData.value,
+    activeModules: activeModules.value,
+    moduleOrder: moduleOrder.value,
+    jdText: jdText.value
+  })
+)
+
 const atsPreviewText = computed(() =>
   buildResumeText(resumeData.value, activeModules.value, moduleOrder.value)
 )
@@ -346,6 +458,7 @@ const atsPreviewText = computed(() =>
 function snapshotUi() {
   return {
     resumeData: JSON.parse(JSON.stringify(resumeData.value)),
+    coverLetter: JSON.parse(JSON.stringify(coverLetter.value)),
     activeModules: [...activeModules.value],
     selectedTemplate: selectedTemplate.value,
     moduleOrder: [...moduleOrder.value],
@@ -356,6 +469,7 @@ function snapshotUi() {
 
 function applySnapshot(snap) {
   resumeData.value = migrateResumeData(snap.resumeData)
+  coverLetter.value = { ...getEmptyCoverLetter(), ...(snap.coverLetter || {}) }
   activeModules.value = snap.activeModules
   selectedTemplate.value = snap.selectedTemplate
   moduleOrder.value = snap.moduleOrder
@@ -374,6 +488,7 @@ function syncProfileFromUi() {
   profiles.value[activeProfileId.value] = {
     ...cur,
     resumeData: resumeData.value,
+    coverLetter: coverLetter.value,
     activeModules: activeModules.value,
     selectedTemplate: selectedTemplate.value,
     moduleOrder: moduleOrder.value,
@@ -384,6 +499,7 @@ function syncProfileFromUi() {
 
 function applyProfileToUi(p) {
   resumeData.value = migrateResumeData(p.resumeData)
+  coverLetter.value = { ...getEmptyCoverLetter(), ...(p.coverLetter || {}) }
   activeModules.value = p.activeModules || getDefaultActiveModules()
   selectedTemplate.value = p.selectedTemplate || 'classic'
   moduleOrder.value = p.moduleOrder || availableModules.map((m) => m.id)
@@ -433,7 +549,7 @@ function markDirty() {
 const recordDebounced = debounce(record, 500)
 
 watch(
-  [resumeData, activeModules, selectedTemplate, moduleOrder, fontSize, layout],
+  [resumeData, coverLetter, activeModules, selectedTemplate, moduleOrder, fontSize, layout],
   () => {
     markDirty()
     saveState()
@@ -460,7 +576,10 @@ onMounted(async () => {
   window.addEventListener('beforeunload', flushSave)
   if (!localStorage.getItem(BACKUP_HINT_KEY)) {
     localStorage.setItem(BACKUP_HINT_KEY, '1')
-    ElMessage.info('数据仅保存在本机浏览器，建议定期使用「导出数据」备份', { duration: 5000 })
+    ElMessage.info({
+      message: '数据仅保存在本机浏览器，建议定期使用「导出数据」备份',
+      duration: 5000
+    })
   }
 })
 
@@ -484,6 +603,17 @@ function moveModule(index, direction) {
   const arr = [...moduleOrder.value]
   ;[arr[index], arr[newIndex]] = [arr[newIndex], arr[index]]
   moduleOrder.value = arr
+}
+
+function setModuleActive(moduleId, checked) {
+  const mod = availableModules.find((item) => item.id === moduleId)
+  if (mod?.required) return
+  const next = new Set(activeModules.value)
+  if (checked) next.add(moduleId)
+  else next.delete(moduleId)
+  activeModules.value = availableModules
+    .map((item) => item.id)
+    .filter((id) => next.has(id))
 }
 
 // ===== 模板切换 =====
@@ -705,10 +835,131 @@ function openUpgradeDialog(source = 'unknown') {
   trackEvent('upgrade_dialog_open', { source, plan: isPro.value ? 'pro' : 'free' })
 }
 
+async function saveCloudSync() {
+  syncProfileFromUi()
+  const payload = buildPersistedAppState({
+    activeProfileId: activeProfileId.value,
+    profiles: profiles.value
+  })
+  const syncCode = localStorage.getItem('resume-builder-sync-code') || ''
+  const { ok, data } = await saveToCloud(payload, syncCode || undefined)
+  if (!ok) {
+    ElMessage.warning(data?.error || '云备份失败，请配置 UPSTASH_REDIS')
+    return
+  }
+  localStorage.setItem('resume-builder-sync-code', data.syncCode)
+  await navigator.clipboard.writeText(data.syncCode)
+  ElMessage.success(`云备份成功，同步码已复制：${data.syncCode}`)
+}
+
+async function loadCloudSync() {
+  try {
+    const { value } = await ElMessageBox.prompt('请输入云同步码', '从云端恢复', {
+      inputValue: localStorage.getItem('resume-builder-sync-code') || ''
+    })
+    const { ok, data } = await loadFromCloud(value.trim())
+    if (!ok || !data.payload) {
+      ElMessage.error(data?.error || '恢复失败')
+      return
+    }
+    const imported = importToAppState(data.payload)
+    if (!imported) {
+      ElMessage.error('云端数据格式无效')
+      return
+    }
+    profiles.value = imported.profiles
+    activeProfileId.value = imported.activeProfileId
+    loadActiveProfile()
+    localStorage.setItem('resume-builder-sync-code', value.trim())
+    ElMessage.success('已从云端恢复简历数据')
+  } catch {
+    /* cancelled */
+  }
+}
+
+async function runGenerateSummary() {
+  aiPending.value = true
+  try {
+    const text = await generateProfessionalSummary(resumeData.value)
+    resumeData.value = { ...resumeData.value, objective: text }
+    ElMessage.success('已生成求职摘要并填入「求职意向」')
+  } catch (e) {
+    ElMessage.error(e.message || '生成失败')
+  } finally {
+    aiPending.value = false
+  }
+}
+
+async function runGenerateInterview() {
+  aiPending.value = true
+  try {
+    interviewQuestions.value = await generateInterviewQuestions({
+      resumeData: resumeData.value,
+      jdText: jdText.value
+    })
+    showInterviewDialog.value = true
+  } catch (e) {
+    ElMessage.error(e.message || '生成失败')
+  } finally {
+    aiPending.value = false
+  }
+}
+
+async function copyShareLink() {
+  if (!isPro.value) {
+    openUpgradeDialog('share_link')
+    return
+  }
+  syncProfileFromUi()
+  const url = await buildShareUrl(profileToExportShape(profiles.value[activeProfileId.value]))
+  try {
+    await navigator.clipboard.writeText(url)
+    ElMessage.success('分享链接已复制（只读预览）')
+    trackEvent('share_link_copy', { plan: 'pro' })
+  } catch {
+    ElMessage.error('复制失败，请检查浏览器权限')
+  }
+}
+
+async function exportDocx() {
+  trackEvent('export_docx_click', { plan: isPro.value ? 'pro' : 'free' })
+  await runExportGuard(async () => {
+    const name = resumeData.value.name?.trim() || '简历'
+    await exportResumeDocx({
+      data: resumeData.value,
+      activeModules: activeModules.value,
+      moduleOrder: moduleOrder.value,
+      filename: `${name}_简历.docx`
+    })
+    ElMessage.success('Word 导出成功')
+  })
+}
+
+function exportCoverLetterTxt() {
+  const text = buildCoverLetterText(coverLetter.value, resumeData.value.name)
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${resumeData.value.name?.trim() || '求职信'}_求职信.txt`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+async function exportCoverLetterDocx() {
+  const name = resumeData.value.name?.trim() || '求职信'
+  await exportCoverLetterDocxFile({
+    coverLetter: coverLetter.value,
+    resumeName: resumeData.value.name,
+    filename: `${name}_求职信.docx`
+  })
+  ElMessage.success('求职信 Word 导出成功')
+}
+
 async function goCheckout() {
   trackEvent('checkout_click', { source: upgradeSource.value })
   try {
-    const target = await createCheckoutSession()
+    const target = await createCheckoutSession(subscriptionBilling ? 'subscription' : 'lifetime')
     window.location.href = target
     showUpgradeDialog.value = false
   } catch {
@@ -764,6 +1015,16 @@ body {
   align-items: center;
   margin-bottom: 12px;
 }
+.pane-title {
+  font-size: 14px;
+  color: #667eea;
+  margin: 0 0 12px;
+}
+.billing-hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #946200;
+}
 .jd-panel {
   margin-bottom: 12px;
   padding: 10px;
@@ -773,6 +1034,93 @@ body {
 }
 .jd-label { font-size: 12px; color: #666; margin-bottom: 6px; }
 .jd-result { font-size: 11px; color: #67c23a; margin-top: 6px; }
+.health-panel {
+  margin-bottom: 12px;
+  padding: 12px;
+  background: #fbfcff;
+  border: 1px solid #e4e8ff;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.health-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.health-kicker {
+  font-size: 12px;
+  color: #667085;
+  margin-bottom: 4px;
+}
+.health-score {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: #344054;
+}
+.health-score strong {
+  font-size: 28px;
+  line-height: 1;
+  color: #4755c7;
+}
+.health-score span {
+  font-size: 12px;
+  color: #667085;
+}
+.health-summary {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #475467;
+}
+.health-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.health-check {
+  border-radius: 6px;
+  padding: 4px 7px;
+  font-size: 11px;
+  line-height: 1;
+  border: 1px solid transparent;
+}
+.health-check.good {
+  color: #2f7a3d;
+  background: #edf8ef;
+  border-color: #ccebd3;
+}
+.health-check.warn {
+  color: #946200;
+  background: #fff8e6;
+  border-color: #f4dfaa;
+}
+.health-check.bad {
+  color: #b42318;
+  background: #fff1f0;
+  border-color: #ffd0cc;
+}
+.health-wins {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: #667085;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.ai-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.interview-list {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.7;
+  color: #334155;
+}
 .layout-controls {
   display: flex;
   flex-direction: column;

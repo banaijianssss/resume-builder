@@ -95,7 +95,12 @@ export const TEMPLATE_LAYOUT = {
   modern: 'standard',
   creative: 'standard',
   sidebar: 'sidebar',
-  timeline: 'timeline'
+  timeline: 'timeline',
+  minimal: 'standard',
+  executive: 'standard',
+  academic: 'standard',
+  tech: 'standard',
+  elegant: 'standard'
 }
 
 export function getTemplateLayout(templateId) {

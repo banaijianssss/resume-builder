@@ -1,7 +1,3 @@
-export const config = {
-  maxDuration: 60
-}
-
 export default async function handler(request, response) {
   if (request.method !== 'POST') {
     response.status(405).json({ error: 'Method Not Allowed' })

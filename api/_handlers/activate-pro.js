@@ -1,5 +1,5 @@
-import { getStripeClient } from './_lib/stripeClient.js'
-import { issueProToken } from './_lib/proToken.js'
+import { getStripeClient } from '../_lib/stripeClient.js'
+import { issueProToken } from '../_lib/proToken.js'
 
 export default async function handler(request, response) {
   if (request.method !== 'POST') {

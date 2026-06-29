@@ -1,4 +1,4 @@
-import { getStripeClient } from './_lib/stripeClient.js'
+import { getStripeClient } from '../_lib/stripeClient.js'
 
 function getBaseUrl(request) {
   return (

@@ -1,4 +1,4 @@
-import { verifyProToken } from './_lib/proToken.js'
+import { verifyProToken } from '../_lib/proToken.js'
 
 export default async function handler(request, response) {
   if (request.method !== 'POST') {

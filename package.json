@@ -20,8 +20,6 @@
     "vuedraggable": "^4.1.0"
   },
   "devDependencies": {
-    "@sparticuz/chromium": "^131.0.0",
-    "puppeteer-core": "^23.11.1",
     "@vitejs/plugin-vue": "^6.0.7",
     "puppeteer": "^23.11.1",
     "unplugin-auto-import": "^21.0.0",

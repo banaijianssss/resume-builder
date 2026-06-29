@@ -1,4 +1,0 @@
-.puppeteerrc.cjs
-scripts/export-pdf-core.mjs
-scripts/export-pdf-cli.mjs
-scripts/vite-pdf-plugin.mjs

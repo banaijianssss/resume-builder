@@ -18,10 +18,20 @@ export default async function handler(request, response) {
     return
   }
 
+  let chromium
+  let puppeteer
   try {
-    const chromium = await import('@sparticuz/chromium')
-    const puppeteer = await import('puppeteer-core')
+    chromium = await import('@sparticuz/chromium')
+    puppeteer = await import('puppeteer-core')
+  } catch {
+    response.status(503).json({
+      error: 'Server HD PDF is unavailable on this deployment. Use client-side PDF export.',
+      code: 'SERVER_PDF_UNAVAILABLE'
+    })
+    return
+  }
 
+  try {
     const browser = await puppeteer.default.launch({
       args: chromium.default.args,
       defaultViewport: { width: 794, height: 1123 },
@@ -43,7 +53,8 @@ export default async function handler(request, response) {
     response.status(200).send(Buffer.from(pdf))
   } catch (error) {
     response.status(500).json({
-      error: error?.message || 'PDF export failed. Install @sparticuz/chromium + puppeteer-core on Vercel.'
+      error: error?.message || 'PDF export failed',
+      code: 'SERVER_PDF_FAILED'
     })
   }
 }

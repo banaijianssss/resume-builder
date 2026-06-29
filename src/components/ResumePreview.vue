@@ -203,6 +203,11 @@ async function exportPDFHD() {
     })
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: res.statusText }))
+      if (err.code === 'SERVER_PDF_UNAVAILABLE' || res.status === 503) {
+        ElMessage.warning('服务端高清 PDF 不可用，已改用浏览器快速 PDF 导出')
+        await exportPDF()
+        return
+      }
       throw new Error(err.error || '导出失败')
     }
     const blob = await res.blob()
@@ -214,7 +219,12 @@ async function exportPDFHD() {
     URL.revokeObjectURL(url)
     ElMessage.success('高清 PDF 导出成功（Puppeteer 矢量渲染）')
   } catch (e) {
-    ElMessage.error('高清导出失败：' + e.message)
+    ElMessage.warning('高清导出失败，尝试快速 PDF：' + e.message)
+    try {
+      await exportPDF()
+    } catch {
+      ElMessage.error('PDF 导出失败')
+    }
   } finally {
     showPageBreaks.value = true
     refreshPageBreaks()
